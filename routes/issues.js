@@ -28,17 +28,24 @@ router.get("/:id", async (req, res) => {
 
 // CREATE a new issue
 router.post("/", async (req, res) => {
-    const { title, description, type, status } = req.body;
+    const { title, description, type } = req.body;
 
     try {
         const newIssue = await Issue.create({
             title,
             description,
             type,
-            status,
+            status: "Open",
             userId: 1,
         });
-        res.json(newIssue);
+
+        const newStatusUpdate = await StatusHistory.create({
+            state: "Open",
+            timestamp: new Date(),
+            IssueId: newIssue.id,
+        });
+
+        res.json({newIssue, newStatusUpdate});
     } catch (error) {
         console.error(error);
         res.status(500).send("Server Error");
@@ -109,6 +116,30 @@ router.get("/:id/history", async (req, res) => {
         statusUpdates.sort((a, b) => b.timestamp - a.timestamp)
         console.log(statusUpdates);
         res.json(statusUpdates);
+    } catch (error) {
+        console.error(error);
+        res.status(500).send("Server Error");
+    }
+});
+
+//GET the count of issues by status
+router.get("/status/count", async (req, res) => {
+    try {
+        const openCount = await Issue.count({ where: { status: "Open" } });
+        const inProgressCount = await Issue.count({
+            where: { status: "In Progress" },
+        });
+        const waitingCount = await Issue.count({ where: { status: "Waiting on client" } });
+        const resolvedCount = await Issue.count({ where: { status: "Resolved" } });
+        const totalCount = await Issue.count();
+
+        res.json({
+            openCount,
+            inProgressCount,
+            waitingCount,
+            resolvedCount,
+            totalCount,
+        });
     } catch (error) {
         console.error(error);
         res.status(500).send("Server Error");
