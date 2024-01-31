@@ -1,5 +1,5 @@
 const express = require("express");
-const { Issue } = require("../db/init");
+const { Issue, StatusHistory } = require("../db/init");
 const router = express.Router();
 
 // GET all issues
@@ -59,6 +59,32 @@ router.put("/:id", async (req, res) => {
     }
 });
 
+// Change the status of an existing issue
+router.patch("/:id", async (req, res) => {
+    const issueId = req.params.id;
+    const { status } = req.body;
+
+    try {
+        //Update the status of the issue
+        const issue = await Issue.findByPk(issueId);
+        const updatedIssue = await issue.update({ status: status });
+
+        //Create a new StatusUpdate record
+        const newStatusUpdate = await StatusHistory.create({
+            state: status,
+            timestamp: new Date(),
+            IssueId: issueId,
+        });
+        console.log(
+            `The status of issue ${issueId} has been changed to ${status}`
+        );
+        res.json({updatedIssue, newStatusUpdate});
+    } catch (error) {
+        console.error(error);
+        res.status(500).send("Server Error");
+    }
+});
+
 // DELETE an issue
 router.delete("/:id", async (req, res) => {
     const issueId = req.params.id;
@@ -67,6 +93,22 @@ router.delete("/:id", async (req, res) => {
         const issue = await Issue.findByPk(issueId);
         await issue.destroy();
         res.json({ message: `Issue ${issueId} has been deleted.` });
+    } catch (error) {
+        console.error(error);
+        res.status(500).send("Server Error");
+    }
+});
+
+// GET all status updates for a specific issue
+router.get("/:id/history", async (req, res) => {
+    const issueId = req.params.id;
+
+    try {
+        const issue = await Issue.findByPk(issueId);
+        const statusUpdates = await issue.getStatusHistories();
+        statusUpdates.sort((a, b) => b.timestamp - a.timestamp)
+        console.log(statusUpdates);
+        res.json(statusUpdates);
     } catch (error) {
         console.error(error);
         res.status(500).send("Server Error");
